@@ -77,7 +77,7 @@ for (n_row in 1:nrow(timeline)) {
   speed = timeline[n_row, "speed"]
   lat = timeline[n_row, "lat"]
   lon = timeline[n_row, "lon"]
-  point = st_as_sf(timeline, coords = c("lat", "lon"), crs = 4326) # Attach geometries to lat/lon
+  point = st_as_sf(timeline, coords = c("lat", "lon"), crs = 4326) # Attach geometries to lat/lon 
 }
   is_inzone = st_intersection(point, slowzone) # Need to figure out how to bring our slow speed zone in
   
