@@ -1,0 +1,107 @@
+---
+title: "Vessel Traffic Recommendations"
+author: "WorthWhale"
+date: "2/19/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages}
+
+library(tidyverse)
+library(DBI) # DBI stands for "database interface" and creates a connection between R and other database management systems
+library(sf)
+library(sp)
+library(rgdal)
+library(maps)
+
+```
+
+```{r}
+
+# Read in slow speed zone shapefile and project to WGS84
+slowzone <- read_sf("data/slowspeedzone.shp") %>% 
+  st_transform(crs = 4326)
+
+```
+
+
+```{r}
+
+# Connect to our worthwhale.sqlite database
+con <- dbConnect(RSQLite::SQLite(), "../AIS/worthwhale.sqlite")
+query = "SELECT a.mmsi FROM 
+        (SELECT distinct(mmsi) FROM positions) a
+        LEFT JOIN vessels_nonduplicate on a.mmsi=vessels_nonduplicate.mmsi
+        LEFT JOIN vessel_types ON vessel_types.vessel_type = vessels_nonduplicate.vessel_type
+        WHERE vessel_types.category IN ('passenger', 'merchant');"
+
+# Send the query to SQLite
+res <- dbSendQuery(con, query)
+
+# Bring result of query back into R as vector "mmsis"
+mmsis = dbFetch(res)
+
+```
+
+```{r}
+
+# Create another query
+  # %s means insert a string in order
+  # Have to specify order by timestamp instead of mmsi
+proto_query = "SELECT timestamp, speed, lat, lon 
+        FROM positions 
+        WHERE mmsi=%s 
+        ORDER BY timestamp"
+
+# Create function to match timestamp, speed, lat, lon to mmsis
+get_timeline = function(mmsi) {
+  query = sprintf(proto_query, mmsi) # For every mmsi, brings proto_query into query
+  res = dbSendQuery(con, query) # Updating result in SQLite
+  positions = dbFetch(res) # Bringing SQLite result back as "positions"
+  return(positions) # Positions returned when function is used
+}
+
+```
+
+```{r}
+
+# Example: put MMSI into "get_timeline" function
+timeline = get_timeline(356042000.0)
+
+# Create for loop that outputs points for vessels going > 10kts within slow speed zone
+for (n_row in 1:nrow(timeline)) {
+  speed = timeline[n_row, "speed"]
+  lat = timeline[n_row, "lat"]
+  lon = timeline[n_row, "lon"]
+  point = st_as_sf(timeline, coords = c("lat", "lon"), crs = 4326) # Attach geometries to lat/lon
+}
+  is_inzone = st_intersection(point, slowzone) # Need to figure out how to bring our slow speed zone in
+  
+  #is_inzone = st_intersection(st_geometry(slowzone), st_geometry(point)) # Need to figure out how to bring our slow speed zone in
+  
+  
+  if (speed > 10 & is_inzone) {
+    
+  } else {
+    
+  }
+}
+
+```
+
+```{r}
+
+# Can delete this?
+query = sprintf(proto_query, mmsi)
+for (mmsi in mmsis) {
+  get_timeline(mmsi) 
+}
+
+```
+
+
+
